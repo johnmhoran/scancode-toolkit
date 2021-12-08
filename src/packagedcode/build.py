@@ -239,13 +239,16 @@ class MetadataBzl(BaseBuildManifestPackage):
         # TODO: Create function that determines package type from download URL,
         # then create a package of that package type from the metadata info
         yield cls(
-            type=metadata_fields.get('upstream_type', ''),
+            type=metadata_fields.get('package_type', ''),
             name=metadata_fields.get('name', ''),
             version=metadata_fields.get('version', ''),
-            declared_license=metadata_fields.get('licenses', []),
+            declared_license=metadata_fields.get('license_expression', ''),
             parties=parties,
-            homepage_url=metadata_fields.get('upstream_address', ''),
-            # TODO: Store 'upstream_hash` somewhere
+            homepage_url=metadata_fields.get('homepage_url', ''),
+            download_url=metadata_fields.get('download_url', ''),
+            vcs_url=metadata_fields.get('vcs_url', ''),
+            sha1=metadata_fields.get('download_archive_sha1', ''),
+            extra_data=dict(vcs_commit_hash=metadata_fields.get('vcs_commit_hash', ''))
         )
 
     def compute_normalized_license(self):
@@ -256,10 +259,9 @@ class MetadataBzl(BaseBuildManifestPackage):
         if not self.declared_license:
             return
 
-        detected_licenses = []
-        for declared in self.declared_license:
-            detected_license = models.compute_normalized_license(declared)
-            detected_licenses.append(detected_license)
+        from licensedcode import cache
 
-        if detected_licenses:
-            return combine_expressions(detected_licenses)
+        idx = cache.get_index()
+        parsed_license = idx.match(query_string=self.declared_license, as_expression=True)
+        if parsed_license and len(parsed_license) == 1:
+            return parsed_license.rule.license_expression
