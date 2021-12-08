@@ -236,17 +236,47 @@ class MetadataBzl(BaseBuildManifestPackage):
                 )
             )
 
-        # TODO: Create function that determines package type from download URL,
-        # then create a package of that package type from the metadata info
-        yield cls(
-            type=metadata_fields.get('upstream_type', ''),
-            name=metadata_fields.get('name', ''),
-            version=metadata_fields.get('version', ''),
-            declared_license=metadata_fields.get('licenses', []),
-            parties=parties,
-            homepage_url=metadata_fields.get('upstream_address', ''),
-            # TODO: Store 'upstream_hash` somewhere
-        )
+        if ('upstream_type'
+                and 'name'
+                and 'version'
+                and 'licenses'
+                and 'upstream_address'
+                in metadata_fields):
+            # TODO: Create function that determines package type from download URL,
+            # then create a package of that package type from the metadata info
+            yield cls(
+                type=metadata_fields.get('upstream_type', ''),
+                name=metadata_fields.get('name', ''),
+                version=metadata_fields.get('version', ''),
+                declared_license=metadata_fields.get('licenses', []),
+                parties=parties,
+                homepage_url=metadata_fields.get('upstream_address', ''),
+                # TODO: Store 'upstream_hash` somewhere
+            )
+
+        if ('package_type'
+                and 'name'
+                and 'version'
+                and 'license_expression'
+                and 'homepage_url'
+                and 'download_url'
+                and 'vcs_url'
+                and 'download_archive_sha1'
+                and 'vcs_commit_hash'
+                in metadata_fields):
+            yield cls(
+                type=metadata_fields.get('package_type', ''),
+                name=metadata_fields.get('name', ''),
+                version=metadata_fields.get('version', ''),
+                declared_license=metadata_fields.get('license_expression', ''),
+                parties=parties,
+                homepage_url=metadata_fields.get('homepage_url', ''),
+                download_url=metadata_fields.get('download_url', ''),
+                vcs_url=metadata_fields.get('vcs_url', ''),
+                sha1=metadata_fields.get('download_archive_sha1', ''),
+                extra_data=dict(vcs_commit_hash=metadata_fields.get('vcs_commit_hash', ''))
+            )
+
 
     def compute_normalized_license(self):
         """
@@ -256,10 +286,18 @@ class MetadataBzl(BaseBuildManifestPackage):
         if not self.declared_license:
             return
 
-        detected_licenses = []
-        for declared in self.declared_license:
-            detected_license = models.compute_normalized_license(declared)
-            detected_licenses.append(detected_license)
+        if isinstance(self.declared_license, list):
+            detected_licenses = []
+            for declared in self.declared_license:
+                detected_license = models.compute_normalized_license(declared)
+                detected_licenses.append(detected_license)
 
-        if detected_licenses:
-            return combine_expressions(detected_licenses)
+            if detected_licenses:
+                return combine_expressions(detected_licenses)
+        else:
+            from licensedcode import cache
+
+            idx = cache.get_index()
+            parsed_license = idx.match(query_string=self.declared_license, as_expression=True)
+            if parsed_license and len(parsed_license) == 1:
+                return parsed_license.rule.license_expression
