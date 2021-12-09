@@ -221,12 +221,13 @@ class MetadataBzl(BaseBuildManifestPackage):
                             if not isinstance(e, ast.Str):
                                 continue
                             value.append(e.s)
-                    if isinstance(statement_v, ast.Str):
+                    if (isinstance(statement_v, ast.Str)
+                            or isinstance(statement_v, ast.Constant)):
                         value = statement_v.s
                     metadata_fields[key_name] = value
 
         parties = []
-        maintainers = metadata_fields.get('maintainers', [])
+        maintainers = metadata_fields.get('maintainers', []) or []
         for maintainer in maintainers:
             parties.append(
                 models.Party(
@@ -300,4 +301,4 @@ class MetadataBzl(BaseBuildManifestPackage):
             idx = cache.get_index()
             parsed_license = idx.match(query_string=self.declared_license, as_expression=True)
             if parsed_license and len(parsed_license) == 1:
-                return parsed_license.rule.license_expression
+                return parsed_license[0].rule.license_expression
